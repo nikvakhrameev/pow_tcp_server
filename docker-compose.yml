@@ -1,0 +1,19 @@
+version: "3.7"
+services:
+
+  server:
+    build:
+      dockerfile: Dockerfile_server
+      context: .
+    ports:
+      - "8085:8085"
+
+  client:
+    build:
+      dockerfile: Dockerfile_client
+      context: .
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      - POW_CLIENT_SERVER_URL=server:8085
