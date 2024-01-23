@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"log/slog"
 	"os"
 
@@ -17,7 +18,11 @@ func main() {
 	cfg := new(Config)
 	cfg.fromEnv(appName)
 
-	powSolver := pow.NewChallenger()
+	powSolver := pow.NewChallenger(
+		pow.NewDifficultyStorage(),
+		pow.NewRandomDataGenerator(sha256.Size),
+		pow.NewSha256Hasher(),
+	)
 
 	ctx := context.Background()
 

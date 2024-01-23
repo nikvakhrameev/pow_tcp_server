@@ -17,6 +17,10 @@ type DdosProtector interface {
 	CheckSolution(challenge pow.Challenge, nonce uint64) (bool, error)
 }
 
+type WisdomQuotesGetter interface {
+	GetWisdomQuote() string
+}
+
 type PowChallenge struct {
 	Data       string `json:"data"`
 	Difficulty int    `json:"difficulty"`

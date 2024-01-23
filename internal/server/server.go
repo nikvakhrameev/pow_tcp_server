@@ -15,12 +15,19 @@ type Server struct {
 	logger        *slog.Logger
 	cfg           Config
 	ddosProtector DdosProtector
+	wisdomQuotes  WisdomQuotesGetter
 }
 
-func NewServer(cfg Config, protector DdosProtector, logger slog.Handler) *Server {
+func NewServer(
+	cfg Config,
+	protector DdosProtector,
+	wisdomQuotes WisdomQuotesGetter,
+	logger slog.Handler,
+) *Server {
 	return &Server{
 		cfg:           cfg,
 		ddosProtector: protector,
+		wisdomQuotes:  wisdomQuotes,
 		logger:        slog.New(logger.WithGroup("server")),
 	}
 }
@@ -74,9 +81,8 @@ func (s *Server) handleConnection(conn net.Conn) error {
 		return nil
 	}
 
-	if err := json.NewEncoder(conn).Encode(WordOfWisdom{
-		Text: "Good people are good because they've come to wisdom through failure."},
-	); err != nil {
+	quoteOfWisdom := s.wisdomQuotes.GetWisdomQuote()
+	if err := json.NewEncoder(conn).Encode(WordOfWisdom{Text: quoteOfWisdom}); err != nil {
 		return fmt.Errorf("write word of wisdom to connection error: %w", err)
 	}
 

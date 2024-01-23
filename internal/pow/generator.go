@@ -2,8 +2,6 @@ package pow
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -11,26 +9,32 @@ import (
 	"strings"
 )
 
-const (
-	powDifficulty = 7
-)
+type Challenger struct {
+	difficultyGetter    DifficultyGetter
+	randomDataGenerator RandomDataGetter
+	hasher              Hasher
+}
 
-var powDifficultyString = strings.Repeat("0", powDifficulty)
-
-type Challenger struct{}
-
-func NewChallenger() *Challenger {
-	return new(Challenger)
+func NewChallenger(
+	difficultyGetter DifficultyGetter,
+	randomDataGenerator RandomDataGetter,
+	hasher Hasher,
+) *Challenger {
+	return &Challenger{
+		difficultyGetter:    difficultyGetter,
+		randomDataGenerator: randomDataGenerator,
+		hasher:              hasher,
+	}
 }
 
 func (c *Challenger) GenerateChallenge() (Challenge, error) {
-	data, err := c.generateRandomDataBytes()
+	data, err := c.randomDataGenerator.GetRandomDataBytes()
 	if err != nil {
 		return Challenge{}, fmt.Errorf("generate random data bytes error: %w", err)
 	}
 	return Challenge{
 		Data:       hex.EncodeToString(data),
-		Difficulty: powDifficulty,
+		Difficulty: c.difficultyGetter.GetDifficulty(),
 	}, nil
 }
 
@@ -45,7 +49,7 @@ func (c *Challenger) CheckSolution(challenge Challenge, nonce uint64) (bool, err
 
 	data = append(data, nonceBytes...)
 
-	return c.validateSolution(data), nil
+	return c.validateSolution(data, challenge.GetDifficultyString()), nil
 }
 
 func (c *Challenger) SolvePowChallenge(ctx context.Context, challenge Challenge) (uint64, error) {
@@ -58,6 +62,8 @@ func (c *Challenger) SolvePowChallenge(ctx context.Context, challenge Challenge)
 	data = append(data, nonceBytes...)
 	data = data[:len(data)-8]
 
+	difficultyString := challenge.GetDifficultyString()
+
 	for i := uint64(0); i < math.MaxUint64; i++ {
 		select {
 		case <-ctx.Done():
@@ -66,7 +72,7 @@ func (c *Challenger) SolvePowChallenge(ctx context.Context, challenge Challenge)
 		}
 
 		binary.LittleEndian.PutUint64(nonceBytes, i)
-		if c.validateSolution(append(data, nonceBytes...)) {
+		if c.validateSolution(append(data, nonceBytes...), difficultyString) {
 			return i, nil
 		}
 	}
@@ -74,15 +80,7 @@ func (c *Challenger) SolvePowChallenge(ctx context.Context, challenge Challenge)
 	return 0, fmt.Errorf("no solution error")
 }
 
-func (c *Challenger) validateSolution(dataWithNonce []byte) bool {
-	hash := sha256.Sum256(dataWithNonce)
-	return strings.HasPrefix(hex.EncodeToString(hash[:]), powDifficultyString)
-}
-
-func (c *Challenger) generateRandomDataBytes() ([]byte, error) {
-	b := make([]byte, sha256.Size)
-	if _, err := rand.Read(b); err != nil {
-		return nil, fmt.Errorf("read random bytes error: %w", err)
-	}
-	return b, nil
+func (c *Challenger) validateSolution(dataWithNonce []byte, difficulty string) bool {
+	hash := c.hasher.HashData(dataWithNonce)
+	return strings.HasPrefix(hex.EncodeToString(hash[:]), difficulty)
 }

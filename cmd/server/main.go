@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"log/slog"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/nikvakhrameev/pow_tcp_server/internal/pow"
 	"github.com/nikvakhrameev/pow_tcp_server/internal/server"
+	"github.com/nikvakhrameev/pow_tcp_server/internal/wisdom"
 )
 
 const appName = "POW"
@@ -20,7 +22,11 @@ func main() {
 	cfg := new(Config)
 	cfg.fromEnv(appName)
 
-	powChallenger := pow.NewChallenger()
+	powChallenger := pow.NewChallenger(
+		pow.NewDifficultyStorage(),
+		pow.NewRandomDataGenerator(sha256.Size),
+		pow.NewSha256Hasher(),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -40,7 +46,9 @@ func main() {
 		}
 	}()
 
-	srv := server.NewServer(cfg.Server, powChallenger, logHandler)
+	quotesStorage := wisdom.NewQuotesStorage()
+
+	srv := server.NewServer(cfg.Server, powChallenger, quotesStorage, logHandler)
 
 	logger.Info("run server")
 
